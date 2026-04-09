@@ -1143,6 +1143,21 @@ function switchTab(name, el) {
   renderAll();
 }
 
+// ===== EXPOR FUNÇÕES GLOBAIS (necessário com type=module) =====
+Object.assign(window, {
+  switchTab, addMeta, toggleMetaDone, deleteMeta,
+  toggleDone, toggleSubtask, addSubtaskFromInput, deleteSubtask,
+  deleteTask, moveTask, restoreTask, permanentDelete, clearAllDone,
+  openMoveModal, confirmMove, closeMoveModal,
+  openEditModal, saveEdit, deleteFromEdit, closeEditModal,
+  openEditSubtaskModal, saveSubtaskEdit, closeEditSubtaskModal,
+  addTaskFromRow, buildCompactAddRowHTML,
+  addTag, removeTag, moveTagUp, moveTagDown, setTagColor,
+  addPrazo, togglePrazoDone, deletePrazo,
+  openEditPrazoModal, saveEditPrazo, deleteEditPrazo, closeEditPrazoModal,
+  saveMetaText
+});
+
 // ===== INIT =====
 initFirebase();
 setInterval(() => { checkWeekRollover(); autoAdvanceTasks(); renderAll(); renderPrazos(); }, 60000);
