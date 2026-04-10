@@ -382,8 +382,6 @@ const db = getDatabase(firebaseApp);
 const STATE_REF = ref(db, 'davi/state');
 const BACKUP_KEY = 'planejador_backup_davi';
 
-let isSyncing = false;
-
 function stateHasContent(s) {
   return s && (
     (s.tasks && s.tasks.length > 0) ||
@@ -405,7 +403,6 @@ function loadBackup() {
 }
 
 function saveState() {
-  if (isSyncing) return;
   try {
     set(STATE_REF, state);
     saveBackup(state);
@@ -437,34 +434,24 @@ function initFirebase() {
   );
 
   onValue(STATE_REF, (snapshot) => {
-    isSyncing = true;
     const data = snapshot.val();
-    const backup = loadBackup();
 
-    if (stateHasContent(data)) {
-      // Firebase tem dados — usa ele, mas protege contra regressão
-      if (stateHasContent(backup) &&
-          ((backup.tasks||[]).length + (backup.doneTasks||[]).length) >
-          ((data.tasks||[]).length + (data.doneTasks||[]).length)) {
-        // Backup local tem mais dados que o Firebase — restaura backup
+    if (data) {
+      // Firebase é a fonte da verdade — aplica sempre
+      state = sanitizeState({...state, ...data});
+      saveBackup(state);
+    } else {
+      // Firebase vazio — restaura backup local
+      const backup = loadBackup();
+      if (stateHasContent(backup)) {
         state = sanitizeState({...state, ...backup});
-        set(STATE_REF, state); // sobe o backup para o Firebase
-      } else {
-        state = sanitizeState({...state, ...data});
-        saveBackup(state);
+        set(STATE_REF, state);
       }
-    } else if (stateHasContent(backup)) {
-      // Firebase vazio mas backup local tem dados — restaura
-      state = sanitizeState({...state, ...backup});
-      set(STATE_REF, state);
     }
 
     const overlay = document.getElementById('loadingOverlay');
     if (overlay) overlay.remove();
-    checkWeekRollover();
-    autoAdvanceTasks();
     renderAll();
-    isSyncing = false;
   }, (error) => {
     console.error('Erro Firebase:', error);
     // Tenta usar backup local se Firebase falhar
@@ -539,7 +526,7 @@ function addMeta() {
 
 function saveMetaText(id, value) {
   const m = state.metas.find(m => m.id === id);
-  if (m) { m.text = value; saveState(); }
+  if (m) { m.text = value; }
 }
 
 function toggleMetaDone(id) {
@@ -591,6 +578,7 @@ function buildMetasSection(containerId) {
       inp.value = m.text;
       inp.placeholder = 'Qual é a sua meta?';
       inp.oninput = () => saveMetaText(m.id, inp.value);
+      inp.onblur  = () => saveState();
 
       const del = document.createElement('button');
       del.className = 'meta-del-btn';
@@ -665,8 +653,7 @@ function deleteSubtask(taskId, subId) {
 }
 
 function deleteTask(id) {
-  if (!confirm('Excluir esta tarefa?')) return;
-  state.tasks = state.tasks.filter(t => t.id !== id);
+  state.tasks = state.tasks.filter(t => t.id != id);
   saveState(); renderAll();
 }
 
@@ -942,7 +929,7 @@ function buildDayTaskItem(task) {
         <button class="day-task-btn" title="Mover" onclick="openMoveModal(${task.id})">↔</button>
         <button class="day-task-btn" title="Voltar às tarefas" onclick="moveTask(${task.id},null)">←</button>
         <button class="day-task-btn" title="Editar" onclick="openEditModal(${task.id})">✎</button>
-        <button class="day-task-btn del" title="Excluir" onclick="deleteTask(${task.id})">✕</button>
+        <button class="day-task-btn del" title="Excluir" onclick="deleteTask(${task.id})" title="Excluir">✕</button>
       </div>
     </div>
     ${subInfo}
